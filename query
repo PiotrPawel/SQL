@@ -1,0 +1,46 @@
+WITH
+-- select dimension_1 and dimension_2 from table A and B and join with correct_dimension_2 from table MAP,
+-- return only distinct pairs of dimension_1 and correct_dimension_2
+cte_table_ab AS (
+	SELECT DISTINCT tab_ab.dimension_1, tab_map.correct_dimension_2 AS dimension_2
+	FROM
+		(SELECT "TableA".dimension_1, "TableA".dimension_2
+		FROM "TableA"
+		UNION
+		SELECT "TableB".dimension_1, "TableB".dimension_2
+		FROM "TableB") AS tab_ab
+	JOIN 
+		(SELECT distinct dimension_1, correct_dimension_2
+		FROM "TableMAP") AS tab_map
+	ON tab_ab.dimension_1 = tab_map.dimension_1
+),
+-- table A with correct_dimension_2
+cte_table_a AS(
+	SELECT DISTINCT "TableA".dimension_1, tab_map.correct_dimension_2 AS dimension_2, "TableA".measure_1
+	FROM "TableA"
+	LEFT JOIN
+		(SELECT distinct dimension_1, correct_dimension_2
+		FROM "TableMAP") AS tab_map
+	ON "TableA".dimension_1 = tab_map.dimension_1
+),
+-- table B with correct_dimension_2
+cte_table_b AS(
+	SELECT DISTINCT "TableB".dimension_1, tab_map.correct_dimension_2 AS dimension_2, "TableB".measure_2
+	FROM "TableB"
+	LEFT JOIN
+		(SELECT distinct dimension_1, correct_dimension_2
+		FROM "TableMAP") AS tab_map
+	ON "TableB".dimension_1 = tab_map.dimension_1
+)
+-- aggregations of measure_1 and measure_2 for distinct pairs of dimension_1 and dimension_2
+SELECT 
+	cte_table_ab.dimension_1,
+	cte_table_ab.dimension_2,
+	SUM(COALESCE(cte_table_a.measure_1,0)) AS measure_1,
+	SUM(COALESCE(cte_table_b.measure_2,0)) AS measure_2
+FROM cte_table_ab
+LEFT JOIN cte_table_a
+ON cte_table_ab.dimension_1 = cte_table_a.dimension_1 AND cte_table_ab.dimension_2 = cte_table_a.dimension_2
+LEFT JOIN cte_table_b
+ON cte_table_ab.dimension_1 = cte_table_b.dimension_1 AND cte_table_ab.dimension_2 = cte_table_b.dimension_2
+GROUP BY cte_table_ab.dimension_1, cte_table_ab.dimension_2
